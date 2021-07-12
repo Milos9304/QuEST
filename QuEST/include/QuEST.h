@@ -307,6 +307,8 @@ typedef struct DiagonalOp
     qreal *imag;
     //! A copy of the elements stored persistently on the GPU
     ComplexArray deviceOperator;
+    // Flag indicating real diagonal
+    int hermitian;
 } DiagonalOp;
 
 /** Represents a system of qubits.
@@ -963,6 +965,7 @@ void initPauliHamil(PauliHamil hamil, qreal* coeffs, enum pauliOpType* codes);
  * @returns a dynamic DiagonalOp instance initialised to diag(0,0,...).
  * @param[in] numQubits number of qubits which inform the Hilbert dimension of the operator.
  * @param[in] env the ::QuESTEnv
+ * @param[in] hermitian if diagonal is constrained to be real
  * @throws invalidQuESTInputError() 
  * - if \p numQubits <= 0
  * - if \p numQubits is so large that the number of elements cannot fit in a long long int type, 
@@ -971,7 +974,7 @@ void initPauliHamil(PauliHamil hamil, qreal* coeffs, enum pauliOpType* codes);
  * - if the memory could not be allocated
  * @author Tyson Jones
  */
-DiagonalOp createDiagonalOp(int numQubits, QuESTEnv env);
+DiagonalOp createDiagonalOp(int numQubits, QuESTEnv env, int hermitian);
 
 /** Destroys a ::DiagonalOp created with createDiagonalOp(), freeing its memory.
  *

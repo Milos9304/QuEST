@@ -1430,10 +1430,10 @@ void initPauliHamil(PauliHamil hamil, qreal* coeffs, enum pauliOpType* codes) {
     }
 }
 
-DiagonalOp createDiagonalOp(int numQubits, QuESTEnv env) {
+DiagonalOp createDiagonalOp(int numQubits, QuESTEnv env, int hermitian) {
     validateNumQubitsInDiagOp(numQubits, env.numRanks, __func__);
     
-    return agnostic_createDiagonalOp(numQubits, env);
+    return agnostic_createDiagonalOp(numQubits, env, hermitian);
 }
 
 void destroyDiagonalOp(DiagonalOp op, QuESTEnv env) {
@@ -1474,7 +1474,7 @@ DiagonalOp createDiagonalOpFromPauliHamilFile(char* fn, QuESTEnv env) {
     PauliHamil h = createPauliHamilFromFile(fn); // validates fn
     validateDiagPauliHamilFromFile(h, env.numRanks, __func__);  // destroys h if invalid
 
-    DiagonalOp op = agnostic_createDiagonalOp(h.numQubits, env);
+    DiagonalOp op = agnostic_createDiagonalOp(h.numQubits, env, 1);
     agnostic_initDiagonalOpFromPauliHamil(op, h);
     
     destroyPauliHamil(h);

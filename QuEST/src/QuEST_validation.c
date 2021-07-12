@@ -703,7 +703,7 @@ void validateTrotterParams(int order, int reps, const char* caller) {
 }
 
 void validateDiagOpInit(DiagonalOp op, const char* caller) {
-    QuESTAssert(op.real != NULL && op.imag != NULL, E_DIAGONAL_OP_NOT_INITIALISED, caller);
+    QuESTAssert(op.real != NULL && (op.hermitian || op.imag != NULL), E_DIAGONAL_OP_NOT_INITIALISED, caller);
 }
 
 void validateDiagonalOp(Qureg qureg, DiagonalOp op, const char* caller) {

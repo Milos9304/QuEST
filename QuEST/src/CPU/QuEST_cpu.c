@@ -1332,7 +1332,7 @@ void statevec_destroyQureg(Qureg qureg, QuESTEnv env){
     qureg.pairStateVec.imag = NULL;
 }
 
-DiagonalOp agnostic_createDiagonalOp(int numQubits, QuESTEnv env) {
+DiagonalOp agnostic_createDiagonalOp(int numQubits, QuESTEnv env, int hermitian) {
 
     // the 2^numQubits values will be evenly split between the env.numRanks nodes
     DiagonalOp op;
@@ -1340,13 +1340,15 @@ DiagonalOp agnostic_createDiagonalOp(int numQubits, QuESTEnv env) {
     op.numElemsPerChunk = (1LL << numQubits) / env.numRanks;
     op.chunkId = env.rank;
     op.numChunks = env.numRanks;
+    op.hermitian = hermitian;
 
     // allocate CPU memory (initialised to zero)
     op.real = (qreal*) calloc(op.numElemsPerChunk, sizeof(qreal));
-    op.imag = (qreal*) calloc(op.numElemsPerChunk, sizeof(qreal));
+    if(!hermitian)
+    	op.imag = (qreal*) calloc(op.numElemsPerChunk, sizeof(qreal));
 
     // check cpu memory allocation was successful
-    if ( !op.real || !op.imag ) {
+    if ( !op.real || (!hermitian && !op.imag) ) {
         printf("Could not allocate memory!\n");
         exit(EXIT_FAILURE);
     }
@@ -1356,7 +1358,8 @@ DiagonalOp agnostic_createDiagonalOp(int numQubits, QuESTEnv env) {
 
 void agnostic_destroyDiagonalOp(DiagonalOp op) {
     free(op.real);
-    free(op.imag);
+    if(!op.hermitian)
+    	free(op.imag);
 }
 
 void agnostic_syncDiagonalOp(DiagonalOp op) {
@@ -1368,12 +1371,17 @@ void agnostic_initDiagonalOpFromPauliHamil(DiagonalOp op, PauliHamil hamil) {
     /* each node modifies its op sub-partition, evaluating the full hamil 
      * for every element in the sub-partition 
      */
-    
+
+	int hermitian = op.hermitian;
+
     // unpack op
     long long int offset = op.chunkId * op.numElemsPerChunk;
     long long int numElems = op.numElemsPerChunk;
     qreal* opRe = op.real;
-    qreal* opIm = op.imag;
+    qreal* opIm;
+
+    if(!hermitian)
+    	opIm = op.imag;
     
     // unpack hamil
     int numTerms = hamil.numSumTerms;
@@ -1389,7 +1397,7 @@ void agnostic_initDiagonalOpFromPauliHamil(DiagonalOp op, PauliHamil hamil) {
 # ifdef _OPENMP
 # pragma omp parallel \
     default  (none) \
-    shared   (offset,numElems, opRe,opIm, numTerms,numQubits,coeffs,codes) \
+    shared   (hermitian, offset,numElems, opRe,opIm, numTerms,numQubits,coeffs,codes) \
     private  (i,globalInd, elem, isOddNumOnes,t,q,sign) 
 # endif
     {
@@ -1417,7 +1425,8 @@ void agnostic_initDiagonalOpFromPauliHamil(DiagonalOp op, PauliHamil hamil) {
             }
             
             opRe[i] = elem;
-            opIm[i] = 0;
+            if(!hermitian)
+            	opIm[i] = 0;
         }
     }
     
@@ -4086,18 +4095,23 @@ Complex statevec_calcExpecDiagonalOpLocal(Qureg qureg, DiagonalOp op) {
     qreal expecRe = 0;
     qreal expecIm = 0;
     
+    int hermitian = op.hermitian;
+
     long long int index;
     long long int numAmps = qureg.numAmpsPerChunk;
     qreal *stateReal = qureg.stateVec.real;
     qreal *stateImag = qureg.stateVec.imag;
     qreal *opReal = op.real;
-    qreal *opImag = op.imag;
+    qreal *opImag;
     
+    if(!hermitian)
+    	opImag = op.imag;
+
     qreal vecRe,vecIm,vecAbs, opRe, opIm;
     
 # ifdef _OPENMP
 # pragma omp parallel \
-    shared    (stateReal, stateImag, opReal, opImag, numAmps) \
+    shared    (hermitian, stateReal, stateImag, opReal, opImag, numAmps) \
     private   (index, vecRe,vecIm,vecAbs, opRe,opIm) \
     reduction ( +:expecRe, expecIm )
 # endif 
@@ -4109,7 +4123,7 @@ Complex statevec_calcExpecDiagonalOpLocal(Qureg qureg, DiagonalOp op) {
             vecRe = stateReal[index];
             vecIm = stateImag[index];
             opRe = opReal[index];
-            opIm = opImag[index];
+            opIm = hermitian ? 0 : opImag[index];
             
             // abs(vec)^2 op
             vecAbs = vecRe*vecRe + vecIm*vecIm;
